@@ -1,0 +1,113 @@
+#!/bin/bash
+
+cert_get_expiry() {
+	 local expiry="`openssl x509 -noout -text -in \"$1\" | grep 'Not After' | cut -d: -f2-4`";
+	 date -d "$expiry" +%s
+}
+
+is_cert() {
+	openssl x509 -noout -text -in "$1" &> /dev/null && return 0 || return 1
+}
+
+out() {
+	case "$1" in
+		STATUS) $arg_status && echo -e "$2";;
+		WARNING) echo -e "$2" 1>&2;;
+		ERROR)   echo -e "ERROR: $2" 1>&2; exitStatus=1;;
+	esac
+}
+
+time_format() {
+	local t=$1
+	local w=$((t/60/60/24/7))
+	local d=$((t/60/60/24%7))
+	local h=$((t/60/60%24))
+	local m=$((t/60%60))
+	local s=$((t%60))
+	[ "$w" -gt 0 ] && printf ' %dw' $w
+	[ "$d" -gt 0 ] && printf ' %dd' $d
+	[ "$h" -gt 0 ] && printf ' %dh' $h
+	[ "$m" -gt 0 ] && printf ' %dm' $m
+	[ "$s" -lt 0 ] && s=0
+	printf ' %ds ' $s
+}
+
+traverse() {
+	local path="$1"
+
+	# Append / to $path if necessary
+	[ "${path:$((${#path}-1)):1}" != "/" ] && traverse "$1/" && return 0
+
+	# Change to path
+	! [ -d "$path" ] && out ERROR "Path \"$path\" does not exist." && return 0
+	cd "$path"
+
+	# Check if certconf directory exists and is setup correctly
+	local certconf="$2"
+	[ -d "${path}.certconf" ] && certconf="${path}.certconf"
+
+	local configOk=true
+	if [ -n "${certconf}" -a "`dirname \"${certconf}\"`/" = "${path}" ]; then
+		if ! [ -f "${certconf}/config" -a -r "${certconf}/config" ]; then
+			out ERROR "No readable config file in ${certconf}"
+			configOk=false
+		fi
+
+		if ! [ -f "${certconf}/renew.sh" -a -x "${certconf}/renew.sh" ]; then
+			out ERROR "No executable renew.sh in ${certconf}"
+			configOk=false
+		fi
+
+		$configOk || certconf=""
+	fi
+
+	if [ -n "$certconf" ]; then
+		# Read variables from config found most recently
+		source "${certconf}/config"
+
+		# Search directory for files matching $CERTFILE_REGEXP
+		ls -d1 * | while read file; do
+			if [ -f "${file}" ] && echo "${file}" | grep -P "${CERTFILE_REGEXP}" &> /dev/null && is_cert "${file}"; then
+				local expiry="`cert_get_expiry \"${path}${file}\"`"
+				local restTime=$((${expiry}-${now}))
+				local warn=false
+				local renew=false
+				[ "$restTime" -le "${EXPIRY_WARN}" ]  && warn=true
+				[ "$restTime" -le "${EXPIRY_RENEW}" ] && renew=true
+
+				outLevel="STATUS"
+				! $arg_status && $warn  && outLevel="WARNING" && out WARNING "Certificate ${path}${file} is about to expire."
+				! $arg_status && $renew && outLevel="WARNING" && out WARNING "Certificate ${path}${file} needs to be renewed."
+
+				out STATUS "${path}${file}"
+				out $outLevel "\tCONFIG: ${certconf}\n\t\tEXPIRY_WARN=${EXPIRY_WARN} [`time_format \"${EXPIRY_WARN}\"`]\n\t\tEXPIRY_RENEW=${EXPIRY_RENEW} [`time_format \"${EXPIRY_RENEW}\"`]\n\t\tCERTFILE_REGEXP=${CERTFILE_REGEXP}"
+				out $outLevel "\tSTATUS:\n\t\tValid until: `date -d @${expiry}` [`time_format \"${restTime}\"`]"
+				out $outLevel "\t\tWarn       : `date -d @$((${expiry}-${EXPIRY_WARN}))` [`time_format \"$((${expiry}-${EXPIRY_WARN}-$now))\"`] `$warn && echo "(!!)"`"
+				out $outLevel "\t\tRenew      : `date -d @$((${expiry}-${EXPIRY_RENEW}))` [`time_format \"$((${expiry}-${EXPIRY_RENEW}-$now))\"`] `$renew && echo "(!!)"`"
+				out $outLevel ""
+
+				# Run renew.sh with certificate as agument if necessary
+				if $renew && ! $arg_status; then
+					out WARNING "\tRun renew.sh for certificate...\n"
+					${certconf}/renew.sh "${path}${file}" || exitStatus=2
+					out WARNING ""
+				fi
+			fi
+		done
+	fi
+
+	# Traverse directory entries recursively
+	ls -d1 */ 2> /dev/null | while read dir; do
+		traverse "${path}${dir}" "${certconf}"
+	done
+}
+
+arg_status=false
+[ "$2" == "--status" ] && arg_status=true
+
+exitStatus=0
+now="`date +%s`"
+
+! cd -- "$1" &>  /dev/null && out ERROR "Path \"$1\" does not exist." && exit $exitStatus
+traverse "`pwd`"
+exit $exitStatus
