@@ -1,4 +1,4 @@
-# CertWatch.sh #
+# CertWatch #
 
 This script will monitor and optionally renew certificates in a given directory tree.
 
@@ -32,7 +32,7 @@ Assume the following directory structure where each TLS secured service got it's
 
 ## .certconf directories ##
 
-The `.certconf` directories contain two files which control the behavior of `CertWatch.sh`. A `.certconf` directory applies to all certificates within it's root directory and it's subdirectories until it is overwritten by another `.certconf` directory.
+The `.certconf` directories contain two files which control the behavior of `CertWatch`. A `.certconf` directory applies to all certificates within it's root directory and it's subdirectories until it is overwritten by another `.certconf` directory.
 
 That means that configurations in `/etc/certs/.certconf` would be overwritten by `/etc/certs/nginx/.certconf` but still apply to certificates in `/etc/certs/mail/postfix` if no `.certconf` directory exists within `/etc/certs/mail` or `/etc/certs/mail/postfix`.
 
@@ -51,14 +51,14 @@ That means that configurations in `/etc/certs/.certconf` would be overwritten by
 
 ### renew.sh ###
 
-This script will be executed by CertWatch.sh if the certificate is valid for less time than set in `EXPIRY_RENEW.` The absolute path to the certificate will be passed to that script.
+This script will be executed by CertWatch if the certificate is valid for less time than set in `EXPIRY_RENEW.` The absolute path to the certificate will be passed to that script.
 
 
 ## Run the script ##
 
-If you pass the `/etc/cert` listed above together with `--status` to `CertWatch.sh`, you will get an overview of the certificates monitored by the script:
+If you pass the `/etc/cert` listed above together with `--status` to `CertWatch`, you will get an overview of the certificates monitored by the script:
 
-	root@host:~# CertWatch.sh /etc/certs --status
+	root@host:~# CertWatch /etc/certs --status
 	/etc/certs/mail/dovecot/service.crt
 	        CONFIG: /etc/certs/mail/.certconf
 	                EXPIRY_WARN=1209600 [ 2w 0s ]
@@ -104,7 +104,7 @@ If the ``--status`` parameter is omitted, only monitored certifcates will be lis
 
 This allows you to setup a cronjob
 
-	0 14 * * * /usr/local/sbin/CertWatch.sh /etc/certs
+	0 14 * * * /usr/local/sbin/CertWatch /etc/certs
 
 which informs you about near expiries of certificates and renews them if `EXPIRY_RENEW` rest time is reached.
 
