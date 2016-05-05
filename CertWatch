@@ -135,7 +135,6 @@ fi
 exitStatus=0
 now="`date +%s`"
 
-[ -z "$1" ] && out ERROR "No patch given." && exit 1
-! cd -- "$1" &>  /dev/null && out ERROR "Path \"$1\" does not exist." && exit 1
+! cd -- "$CERT_PATH" &>  /dev/null && out ERROR "Path \"$CERT_PATH\" does not exist." && exit 1
 traverse "`pwd`"
 exit $exitStatus
