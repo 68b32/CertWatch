@@ -108,6 +108,10 @@ This allows you to setup a cronjob
 
 which informs you about near expiries of certificates and renews them if `EXPIRY_RENEW` rest time is reached.
 
+The path for the certificates can also be provided from `/etc/CertWatch`
+
+	CERT_PATH="/etc/cert"
+
 ## Examples ##
 
 The `config.example` directory contains an example renew.sh script which uses acme-tiny (https://github.com/diafygi/acme-tiny) and a NGINX configuration to renew the certificates, but you are free to setup any procedure you need to renew your certificates.
