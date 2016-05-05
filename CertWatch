@@ -102,10 +102,35 @@ traverse() {
 	done
 }
 
+usage() {
+        out ERROR "Usage: $0 [<path>] [--status]"
+        exit 1
+}
 
+[ -r "/etc/CertWatch" ] && source /etc/CertWatch
 
 arg_status=false
-[ "$2" == "--status" ] && arg_status=true
+[ $# -gt 2 ] && usage;
+
+if [ $# -eq 2 ]; then
+        CERT_PATH="$1"
+        if [ "$2" == "--status" ]; then
+                arg_status=true
+        else
+                usage;
+        fi
+fi
+
+if [ $# -eq 1 ]; then
+        if [ "$1" == "--status" ]; then
+                arg_status=true
+                [ -z "$CERT_PATH" ] && out ERROR "No path given from cmd or configuration file." && exit 1
+        else
+                CERT_PATH="$1"
+        fi
+fi
+
+[ $# -eq 0 -a -z "$CERT_PATH" ] && out ERROR "No path given from cmd or configuration file." && exit 1
 
 exitStatus=0
 now="`date +%s`"
